@@ -4,7 +4,7 @@ import { ArticleView } from './components/ArticleView';
 import { AuthForm } from './components/AuthForm';
 import { BlogPost, ViewState } from './types';
 import { ArrowRight, BookOpen, TrendingUp, Globe, Cpu, Bookmark } from 'lucide-react';
-import { supabase } from './services/supabase';
+import { supabase, isConfigured } from './services/supabase';
 
 // Blog content 
 const INITIAL_POSTS: BlogPost[] = [
@@ -292,46 +292,43 @@ export default function App() {
   const [session, setSession] = useState<any>(null);
   const [savedPostIds, setSavedPostIds] = useState<string[]>([]);
 
-  // Auth Setup
+  // Auth Setup (Supabase v2)
   useEffect(() => {
-    // Supabase v1 compatibility: session() is synchronous
-    const currentSession = supabase.auth.session ? supabase.auth.session() : null;
-    setSession(currentSession);
+    const setupAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
 
-    // If using v2 or newer but type defs were missing, try getSession async
-    if (!currentSession && supabase.auth.getSession) {
-      supabase.auth.getSession().then(({ data }: any) => {
-         if (data?.session) setSession(data.session);
-      });
-    }
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+          setSession(session);
+        });
 
-    const {
-      data: subscription,
-    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-      setSession(session);
-    });
-
-    return () => {
-      // Handle both v1 (subscription is the object) and v2 (subscription.subscription is the object) structure
-      if (subscription?.unsubscribe) {
-        subscription.unsubscribe();
-      } else if (subscription?.subscription?.unsubscribe) {
-        subscription.subscription.unsubscribe();
+        return () => subscription.unsubscribe();
+      } catch (e) {
+        console.warn("Auth setup error (likely due to mock mode):", e);
       }
     };
+    
+    setupAuth();
   }, []);
 
   // Fetch Saved Posts
   useEffect(() => {
     if (session) {
       const fetchSavedPosts = async () => {
-        const { data } = await supabase
-          .from('saved_posts')
-          .select('post_id')
-          .eq('user_id', session.user.id);
-        
-        if (data) {
-          setSavedPostIds(data.map((item: any) => item.post_id));
+        try {
+          const { data, error } = await supabase
+            .from('saved_posts')
+            .select('post_id')
+            .eq('user_id', session.user.id);
+          
+          if (data && !error) {
+            setSavedPostIds(data.map((item: any) => item.post_id));
+          }
+        } catch (e) {
+          console.warn("Fetch posts error (likely due to mock mode):", e);
         }
       };
       fetchSavedPosts();
@@ -347,34 +344,45 @@ export default function App() {
   };
 
   const handleToggleSave = async (postId: string) => {
+    // isConfigured kontrolü burada şart değil çünkü mock supabase hata mesajı dönecek
+    // ama UX için yine de ekleyebiliriz.
+    
     if (!session) {
       alert('Blog kaydetmek için lütfen giriş yapın.');
       setViewState(ViewState.LOGIN);
       return;
     }
 
-    const isSaved = savedPostIds.includes(postId);
-    
-    if (isSaved) {
-      // Unsave
-      const { error } = await supabase
-        .from('saved_posts')
-        .delete()
-        .eq('user_id', session.user.id)
-        .eq('post_id', postId);
+    try {
+      const isSaved = savedPostIds.includes(postId);
       
-      if (!error) {
-        setSavedPostIds(prev => prev.filter(id => id !== postId));
+      if (isSaved) {
+        // Unsave
+        const { error } = await supabase
+          .from('saved_posts')
+          .delete()
+          .eq('user_id', session.user.id)
+          .eq('post_id', postId);
+        
+        if (!error) {
+          setSavedPostIds(prev => prev.filter(id => id !== postId));
+        } else {
+           alert(error.message);
+        }
+      } else {
+        // Save
+        const { error } = await supabase
+          .from('saved_posts')
+          .insert([{ user_id: session.user.id, post_id: postId }]);
+        
+        if (!error) {
+          setSavedPostIds(prev => [...prev, postId]);
+        } else {
+          alert(error.message);
+        }
       }
-    } else {
-      // Save
-      const { error } = await supabase
-        .from('saved_posts')
-        .insert([{ user_id: session.user.id, post_id: postId }]);
-      
-      if (!error) {
-        setSavedPostIds(prev => [...prev, postId]);
-      }
+    } catch (e: any) {
+      alert(e.message || "İşlem sırasında hata oluştu");
     }
   };
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { supabase } from '../services/supabase';
-import { Loader2, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
+import { supabase, isConfigured } from '../services/supabase';
+import { Loader2, Mail, Lock, ArrowRight, AlertCircle, Database } from 'lucide-react';
 
 interface AuthFormProps {
   type: 'LOGIN' | 'REGISTER';
@@ -20,24 +20,31 @@ export const AuthForm: React.FC<AuthFormProps> = ({ type, onSuccess, onToggleMod
     setError(null);
 
     try {
+      if (!isConfigured) {
+         throw new Error("Demo Modu: Veritabanı bağlantısı (Supabase Keys) yapılmadığı için işlem gerçekleştirilemedi.");
+      }
+
       if (type === 'REGISTER') {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
         });
+        
         if (error) throw error;
-        alert('Kayıt başarılı! Lütfen e-posta kutunuzu kontrol edin veya giriş yapın.');
-        onToggleMode(); // Switch to login after signup
+        
+        alert('Kayıt başarılı! Lütfen e-posta kutunuzu kontrol edin (gerçek modda) veya giriş yapmayı deneyin.');
+        onToggleMode(); 
       } else {
-        // Using signIn instead of signInWithPassword to be compatible with older Supabase versions
-        const { error } = await supabase.auth.signIn({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
+
         if (error) throw error;
         onSuccess();
       }
     } catch (err: any) {
+      console.error('Auth Hatası:', err);
       setError(err.message || 'Bir hata oluştu.');
     } finally {
       setLoading(false);
@@ -58,10 +65,20 @@ export const AuthForm: React.FC<AuthFormProps> = ({ type, onSuccess, onToggleMod
 
         <div className="p-8">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
-              {error}
+            <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
+          )}
+          
+          {!isConfigured && !error && (
+             <div className="mb-6 p-4 bg-amber-50 border border-amber-100 text-amber-800 text-sm rounded-xl flex items-start gap-3">
+                 <Database className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                 <div>
+                   <span className="font-bold block mb-1">Demo Modu Aktif</span>
+                   Veritabanı bağlantısı yapılmadığı için giriş/kayıt işlemleri simüle edilecektir.
+                 </div>
+             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
