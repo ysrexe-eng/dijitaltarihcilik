@@ -29,7 +29,8 @@ export const AuthForm: React.FC<AuthFormProps> = ({ type, onSuccess, onToggleMod
         alert('Kayıt başarılı! Lütfen e-posta kutunuzu kontrol edin veya giriş yapın.');
         onToggleMode(); // Switch to login after signup
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        // Using signIn instead of signInWithPassword to be compatible with older Supabase versions
+        const { error } = await supabase.auth.signIn({
           email,
           password,
         });

@@ -1,6 +1,5 @@
 import React from 'react';
 import { ScrollText, Github, LogIn, UserPlus, LogOut, Bookmark } from 'lucide-react';
-import { Session } from '@supabase/supabase-js';
 
 interface HeaderProps {
   onHome: () => void;
@@ -9,7 +8,7 @@ interface HeaderProps {
   onRegister: () => void;
   onSaved: () => void;
   onLogout: () => void;
-  session: Session | null;
+  session: any;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
