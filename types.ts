@@ -20,5 +20,8 @@ export interface AnalysisData {
 export enum ViewState {
   HOME = 'HOME',
   ARTICLE = 'ARTICLE',
-  ABOUT = 'ABOUT'
+  ABOUT = 'ABOUT',
+  LOGIN = 'LOGIN',
+  REGISTER = 'REGISTER',
+  SAVED = 'SAVED'
 }
