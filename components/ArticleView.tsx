@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BlogPost } from '../types';
-import { ArrowLeft, Calendar, Clock, User, Share2, Bookmark } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Share2, Bookmark } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { StatsChart } from './StatsChart';
 import { ComparisonChart } from './ComparisonChart';
@@ -9,10 +9,13 @@ import { StorageChart } from './StorageChart';
 interface ArticleViewProps {
   article: BlogPost;
   onBack: () => void;
+  isSaved: boolean;
+  onToggleSave: (id: string) => void;
 }
 
-export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => {
+export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSaved, onToggleSave }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -25,6 +28,12 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleSaveClick = async () => {
+    setIsSaving(true);
+    await onToggleSave(article.id);
+    setIsSaving(false);
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -51,8 +60,16 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack }) => 
             <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors">
               <Share2 className="w-5 h-5" />
             </button>
-            <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors">
-              <Bookmark className="w-5 h-5" />
+            <button 
+              onClick={handleSaveClick}
+              disabled={isSaving}
+              className={`p-2 rounded-full transition-colors ${
+                isSaved 
+                  ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' 
+                  : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+              }`}
+            >
+              <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
             </button>
           </div>
         </nav>

@@ -1,10 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ArticleView } from './components/ArticleView';
+import { AuthForm } from './components/AuthForm';
 import { BlogPost, ViewState } from './types';
-import { ArrowRight, BookOpen, TrendingUp, Globe, Cpu } from 'lucide-react';
+import { ArrowRight, BookOpen, TrendingUp, Globe, Cpu, Bookmark } from 'lucide-react';
+import { supabase } from './services/supabase';
+import { Session } from '@supabase/supabase-js';
 
-// Blog content significantly expanded and modern topics added
+// Blog content 
 const INITIAL_POSTS: BlogPost[] = [
   {
     id: '1',
@@ -285,6 +288,44 @@ export default function App() {
   const [posts] = useState<BlogPost[]>(INITIAL_POSTS);
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('Tümü');
+  
+  // Auth & Database State
+  const [session, setSession] = useState<Session | null>(null);
+  const [savedPostIds, setSavedPostIds] = useState<string[]>([]);
+
+  // Auth Setup
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Fetch Saved Posts
+  useEffect(() => {
+    if (session) {
+      const fetchSavedPosts = async () => {
+        const { data } = await supabase
+          .from('saved_posts')
+          .select('post_id')
+          .eq('user_id', session.user.id);
+        
+        if (data) {
+          setSavedPostIds(data.map(item => item.post_id));
+        }
+      };
+      fetchSavedPosts();
+    } else {
+      setSavedPostIds([]);
+    }
+  }, [session]);
 
   const handleReadArticle = (post: BlogPost) => {
     setSelectedPost(post);
@@ -292,11 +333,47 @@ export default function App() {
     window.scrollTo(0, 0);
   };
 
+  const handleToggleSave = async (postId: string) => {
+    if (!session) {
+      alert('Blog kaydetmek için lütfen giriş yapın.');
+      setViewState(ViewState.LOGIN);
+      return;
+    }
+
+    const isSaved = savedPostIds.includes(postId);
+    
+    if (isSaved) {
+      // Unsave
+      const { error } = await supabase
+        .from('saved_posts')
+        .delete()
+        .eq('user_id', session.user.id)
+        .eq('post_id', postId);
+      
+      if (!error) {
+        setSavedPostIds(prev => prev.filter(id => id !== postId));
+      }
+    } else {
+      // Save
+      const { error } = await supabase
+        .from('saved_posts')
+        .insert([{ user_id: session.user.id, post_id: postId }]);
+      
+      if (!error) {
+        setSavedPostIds(prev => [...prev, postId]);
+      }
+    }
+  };
+
   const filteredPosts = useMemo(() => {
+    // Show saved posts only
+    if (viewState === ViewState.SAVED) {
+      return posts.filter(p => savedPostIds.includes(p.id));
+    }
+
     if (selectedCategory === 'Tümü') return posts;
     
     const lowerCat = selectedCategory.toLowerCase();
-    // Haritalama: Kategori butonları ile etiketler arasındaki ilişki
     const tagMap: Record<string, string[]> = {
       'teknoloji': ['teknoloji', 'yapayzeka', 'ai', 'blokzincir', 'vr'],
       'analiz': ['analiz', 'verianalizi', 'mekansalanaliz', 'gis'],
@@ -310,147 +387,216 @@ export default function App() {
         targetTags.some(target => tag.toLowerCase().includes(target))
       )
     );
-  }, [posts, selectedCategory]);
+  }, [posts, selectedCategory, viewState, savedPostIds]);
+
+  const renderMainContent = () => (
+    <main className="animate-fade-in-up">
+      {/* Conditional Hero: Only show on standard HOME view */}
+      {viewState === ViewState.HOME && (
+        <div className="relative bg-slate-900 text-white overflow-hidden mb-16">
+          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80')] bg-cover bg-center opacity-20 mix-blend-overlay"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-900/90"></div>
+          <div className="relative max-w-6xl mx-auto px-4 py-32 text-center">
+            <span className="inline-block py-1 px-3 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-sm font-semibold mb-6 backdrop-blur-sm">
+              22.11.2025 • Dijital Tarihçilik Blogu
+            </span>
+            <h1 className="text-5xl md:text-7xl font-serif font-bold mb-8 leading-tight tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-slate-400">
+              Geçmişin İzinde,<br />Geleceğin Teknolojisiyle.
+            </h1>
+            <p className="text-xl text-slate-300 max-w-2xl mx-auto font-light leading-relaxed mb-10">
+              Yaşar Efe Çelik tarafından hazırlanan, dijitalleşmenin tarih yazımı üzerindeki devrimsel etkilerini inceleyen araştırma platformu.
+            </p>
+            <div className="flex justify-center gap-4">
+              <button onClick={() => document.getElementById('posts')?.scrollIntoView({ behavior: 'smooth' })} className="px-8 py-3 bg-white text-slate-900 rounded-full font-bold hover:bg-indigo-50 transition-colors shadow-lg shadow-indigo-900/20">
+                Okumaya Başla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewState === ViewState.SAVED && (
+         <div className="max-w-6xl mx-auto px-4 pt-10 pb-6">
+            <h2 className="text-3xl font-serif font-bold text-slate-900 flex items-center gap-3">
+              <Bookmark className="w-8 h-8 text-indigo-600" />
+              Kaydedilen Yazılar
+            </h2>
+            <p className="text-slate-500 mt-2">Okuma listenizdeki makaleler burada saklanır.</p>
+         </div>
+      )}
+
+      {/* Featured Stats Bar - Only on HOME */}
+      {viewState === ViewState.HOME && (
+        <div className="max-w-6xl mx-auto px-4 -mt-10 mb-16 relative z-10">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-100 p-6 grid grid-cols-1 md:grid-cols-3 gap-8 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+              <div className="flex items-center gap-4 p-2">
+                  <div className="p-3 bg-indigo-50 rounded-lg text-indigo-600"><TrendingUp size={24}/></div>
+                  <div>
+                      <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">Dijital Erişim</p>
+                      <p className="text-2xl font-bold text-slate-900">%800 Artış</p>
+                  </div>
+              </div>
+              <div className="flex items-center gap-4 p-2">
+                  <div className="p-3 bg-emerald-50 rounded-lg text-emerald-600"><Globe size={24}/></div>
+                  <div>
+                      <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">Küresel Arşiv</p>
+                      <p className="text-2xl font-bold text-slate-900">250+ Kütüphane</p>
+                  </div>
+              </div>
+              <div className="flex items-center gap-4 p-2">
+                  <div className="p-3 bg-amber-50 rounded-lg text-amber-600"><Cpu size={24}/></div>
+                  <div>
+                      <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">AI Analizi</p>
+                      <p className="text-2xl font-bold text-slate-900">Milisaniye Hız</p>
+                  </div>
+              </div>
+          </div>
+        </div>
+      )}
+
+      {/* Blog Grid */}
+      <div id="posts" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
+        {viewState === ViewState.HOME && (
+          <div className="flex flex-col sm:flex-row items-center justify-between mb-10 gap-4">
+              <h2 className="text-3xl font-serif font-bold text-slate-900">Son Yazılar</h2>
+              <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 w-full sm:w-auto no-scrollbar">
+                  {CATEGORIES.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
+                        selectedCategory === cat 
+                          ? 'bg-slate-900 text-white shadow-md' 
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+              </div>
+          </div>
+        )}
+
+        {filteredPosts.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredPosts.map((post, index) => (
+              <article 
+                key={post.id} 
+                className={`group flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 animate-fade-in-up ${
+                   // Feature first post only on Home view with 'All' category
+                   viewState === ViewState.HOME && index === 0 && selectedCategory === 'Tümü' 
+                    ? 'lg:col-span-2 lg:grid lg:grid-cols-2 lg:gap-0' 
+                    : 'delay-100'
+                }`}
+                onClick={() => handleReadArticle(post)}
+              >
+                <div className={`overflow-hidden relative ${
+                    viewState === ViewState.HOME && index === 0 && selectedCategory === 'Tümü' 
+                    ? 'lg:h-full h-64' 
+                    : 'h-56'
+                }`}>
+                  <img 
+                    src={post.imageUrl} 
+                    alt={post.title} 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  />
+                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
+                  {savedPostIds.includes(post.id) && (
+                     <div className="absolute top-4 right-4">
+                        <div className="bg-indigo-600 p-1.5 rounded-full shadow-lg">
+                           <Bookmark className="w-3 h-3 text-white fill-current" />
+                        </div>
+                     </div>
+                  )}
+                  <div className="absolute top-4 left-4">
+                      <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-slate-900 text-xs font-bold rounded-full shadow-sm border border-slate-100">
+                          {post.tags[0].replace('#', '')}
+                      </span>
+                  </div>
+                </div>
+                
+                <div className={`p-6 flex flex-col justify-center ${
+                    viewState === ViewState.HOME && index === 0 && selectedCategory === 'Tümü' 
+                    ? 'lg:p-10' 
+                    : ''
+                }`}>
+                  <div className="flex items-center gap-2 text-xs text-slate-400 font-medium mb-3">
+                    <span className="text-indigo-600 font-bold">{post.date}</span>
+                    <span>•</span>
+                    <span>{post.readTime} dk okuma</span>
+                  </div>
+                  
+                  <h3 className={`font-serif font-bold text-slate-900 mb-3 group-hover:text-indigo-600 transition-colors leading-tight ${
+                      viewState === ViewState.HOME && index === 0 && selectedCategory === 'Tümü' 
+                      ? 'text-2xl lg:text-3xl' 
+                      : 'text-xl'
+                  }`}>
+                    {post.title}
+                  </h3>
+                  
+                  <p className="text-slate-500 mb-6 leading-relaxed line-clamp-3 text-sm lg:text-base">
+                    {post.summary}
+                  </p>
+                  
+                  <div className="mt-auto flex items-center text-sm font-bold text-indigo-600 group-hover:translate-x-2 transition-transform duration-300">
+                    Devamını Oku <ArrowRight className="w-4 h-4 ml-1" />
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-20 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            <p className="text-slate-500">
+                {viewState === ViewState.SAVED 
+                    ? 'Henüz kaydedilmiş bir yazınız yok.' 
+                    : 'Bu kategoride henüz yazı bulunmuyor.'}
+            </p>
+            <button 
+                onClick={() => {
+                    setViewState(ViewState.HOME);
+                    setSelectedCategory('Tümü');
+                }} 
+                className="text-indigo-600 font-bold mt-2 hover:underline"
+            >
+                Tüm yazıları gör
+            </button>
+          </div>
+        )}
+      </div>
+    </main>
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 selection:bg-indigo-200">
       <Header 
         onHome={() => setViewState(ViewState.HOME)} 
         onAbout={() => setViewState(ViewState.ABOUT)}
+        onLogin={() => setViewState(ViewState.LOGIN)}
+        onRegister={() => setViewState(ViewState.REGISTER)}
+        onSaved={() => setViewState(ViewState.SAVED)}
+        onLogout={() => supabase.auth.signOut()}
+        session={session}
       />
 
-      {viewState === ViewState.HOME && (
-        <main className="animate-fade-in-up">
-          {/* Modern Hero Section */}
-          <div className="relative bg-slate-900 text-white overflow-hidden mb-16">
-            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80')] bg-cover bg-center opacity-20 mix-blend-overlay"></div>
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-900/90"></div>
-            <div className="relative max-w-6xl mx-auto px-4 py-32 text-center">
-              <span className="inline-block py-1 px-3 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-sm font-semibold mb-6 backdrop-blur-sm">
-                22.11.2025 • Dijital Tarihçilik Blogu
-              </span>
-              <h1 className="text-5xl md:text-7xl font-serif font-bold mb-8 leading-tight tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-slate-400">
-                Geçmişin İzinde,<br />Geleceğin Teknolojisiyle.
-              </h1>
-              <p className="text-xl text-slate-300 max-w-2xl mx-auto font-light leading-relaxed mb-10">
-                Yaşar Efe Çelik tarafından hazırlanan, dijitalleşmenin tarih yazımı üzerindeki devrimsel etkilerini inceleyen araştırma platformu.
-              </p>
-              <div className="flex justify-center gap-4">
-                <button onClick={() => document.getElementById('posts')?.scrollIntoView({ behavior: 'smooth' })} className="px-8 py-3 bg-white text-slate-900 rounded-full font-bold hover:bg-indigo-50 transition-colors shadow-lg shadow-indigo-900/20">
-                  Okumaya Başla
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Featured Stats Bar */}
-          <div className="max-w-6xl mx-auto px-4 -mt-10 mb-16 relative z-10">
-            <div className="bg-white rounded-xl shadow-xl border border-slate-100 p-6 grid grid-cols-1 md:grid-cols-3 gap-8 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-                <div className="flex items-center gap-4 p-2">
-                    <div className="p-3 bg-indigo-50 rounded-lg text-indigo-600"><TrendingUp size={24}/></div>
-                    <div>
-                        <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">Dijital Erişim</p>
-                        <p className="text-2xl font-bold text-slate-900">%800 Artış</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-4 p-2">
-                    <div className="p-3 bg-emerald-50 rounded-lg text-emerald-600"><Globe size={24}/></div>
-                    <div>
-                        <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">Küresel Arşiv</p>
-                        <p className="text-2xl font-bold text-slate-900">250+ Kütüphane</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-4 p-2">
-                    <div className="p-3 bg-amber-50 rounded-lg text-amber-600"><Cpu size={24}/></div>
-                    <div>
-                        <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">AI Analizi</p>
-                        <p className="text-2xl font-bold text-slate-900">Milisaniye Hız</p>
-                    </div>
-                </div>
-            </div>
-          </div>
-
-          {/* Blog Grid */}
-          <div id="posts" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
-            <div className="flex flex-col sm:flex-row items-center justify-between mb-10 gap-4">
-                <h2 className="text-3xl font-serif font-bold text-slate-900">Son Yazılar</h2>
-                <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 w-full sm:w-auto no-scrollbar">
-                    {CATEGORIES.map(cat => (
-                      <button
-                        key={cat}
-                        onClick={() => setSelectedCategory(cat)}
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
-                          selectedCategory === cat 
-                            ? 'bg-slate-900 text-white shadow-md' 
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                </div>
-            </div>
-
-            {filteredPosts.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {filteredPosts.map((post, index) => (
-                  <article 
-                    key={post.id} 
-                    className={`group flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 animate-fade-in-up ${index === 0 && selectedCategory === 'Tümü' ? 'lg:col-span-2 lg:grid lg:grid-cols-2 lg:gap-0' : 'delay-100'}`}
-                    onClick={() => handleReadArticle(post)}
-                  >
-                    <div className={`overflow-hidden relative ${index === 0 && selectedCategory === 'Tümü' ? 'lg:h-full h-64' : 'h-56'}`}>
-                      <img 
-                        src={post.imageUrl} 
-                        alt={post.title} 
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                      />
-                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
-                      <div className="absolute top-4 left-4">
-                          <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-slate-900 text-xs font-bold rounded-full shadow-sm border border-slate-100">
-                              {post.tags[0].replace('#', '')}
-                          </span>
-                      </div>
-                    </div>
-                    
-                    <div className={`p-6 flex flex-col justify-center ${index === 0 && selectedCategory === 'Tümü' ? 'lg:p-10' : ''}`}>
-                      <div className="flex items-center gap-2 text-xs text-slate-400 font-medium mb-3">
-                        <span className="text-indigo-600 font-bold">{post.date}</span>
-                        <span>•</span>
-                        <span>{post.readTime} dk okuma</span>
-                      </div>
-                      
-                      <h3 className={`font-serif font-bold text-slate-900 mb-3 group-hover:text-indigo-600 transition-colors leading-tight ${index === 0 && selectedCategory === 'Tümü' ? 'text-2xl lg:text-3xl' : 'text-xl'}`}>
-                        {post.title}
-                      </h3>
-                      
-                      <p className="text-slate-500 mb-6 leading-relaxed line-clamp-3 text-sm lg:text-base">
-                        {post.summary}
-                      </p>
-                      
-                      <div className="mt-auto flex items-center text-sm font-bold text-indigo-600 group-hover:translate-x-2 transition-transform duration-300">
-                        Devamını Oku <ArrowRight className="w-4 h-4 ml-1" />
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-20 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <p className="text-slate-500">Bu kategoride henüz yazı bulunmuyor.</p>
-                <button onClick={() => setSelectedCategory('Tümü')} className="text-indigo-600 font-bold mt-2 hover:underline">Tüm yazıları gör</button>
-              </div>
-            )}
-          </div>
-        </main>
-      )}
+      {(viewState === ViewState.HOME || viewState === ViewState.SAVED) && renderMainContent()}
 
       {viewState === ViewState.ABOUT && <AboutPage />}
+
+      {(viewState === ViewState.LOGIN || viewState === ViewState.REGISTER) && (
+        <AuthForm 
+          type={viewState as 'LOGIN' | 'REGISTER'}
+          onSuccess={() => setViewState(ViewState.HOME)}
+          onToggleMode={() => setViewState(viewState === ViewState.LOGIN ? ViewState.REGISTER : ViewState.LOGIN)}
+        />
+      )}
 
       {viewState === ViewState.ARTICLE && selectedPost && (
         <ArticleView 
           article={selectedPost} 
           onBack={() => setViewState(ViewState.HOME)} 
+          isSaved={savedPostIds.includes(selectedPost.id)}
+          onToggleSave={handleToggleSave}
         />
       )}
 
@@ -471,6 +617,7 @@ export default function App() {
                 <ul className="space-y-3 text-slate-400 text-sm">
                     <li onClick={() => setViewState(ViewState.HOME)} className="hover:text-indigo-400 cursor-pointer transition-colors">Ana Sayfa</li>
                     <li onClick={() => setViewState(ViewState.ABOUT)} className="hover:text-indigo-400 cursor-pointer transition-colors">Hakkımda</li>
+                    {session && <li onClick={() => setViewState(ViewState.SAVED)} className="hover:text-indigo-400 cursor-pointer transition-colors">Kaydedilenler</li>}
                 </ul>
             </div>
           </div>
