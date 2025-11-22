@@ -5,7 +5,6 @@ import { AuthForm } from './components/AuthForm';
 import { BlogPost, ViewState } from './types';
 import { ArrowRight, BookOpen, TrendingUp, Globe, Cpu, Bookmark } from 'lucide-react';
 import { supabase } from './services/supabase';
-import { Session } from '@supabase/supabase-js';
 
 // Blog content 
 const INITIAL_POSTS: BlogPost[] = [
@@ -290,22 +289,36 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState('Tümü');
   
   // Auth & Database State
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<any>(null);
   const [savedPostIds, setSavedPostIds] = useState<string[]>([]);
 
   // Auth Setup
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
+    // Supabase v1 compatibility: session() is synchronous
+    const currentSession = supabase.auth.session ? supabase.auth.session() : null;
+    setSession(currentSession);
+
+    // If using v2 or newer but type defs were missing, try getSession async
+    if (!currentSession && supabase.auth.getSession) {
+      supabase.auth.getSession().then(({ data }: any) => {
+         if (data?.session) setSession(data.session);
+      });
+    }
 
     const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+      data: subscription,
+    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       setSession(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      // Handle both v1 (subscription is the object) and v2 (subscription.subscription is the object) structure
+      if (subscription?.unsubscribe) {
+        subscription.unsubscribe();
+      } else if (subscription?.subscription?.unsubscribe) {
+        subscription.subscription.unsubscribe();
+      }
+    };
   }, []);
 
   // Fetch Saved Posts
@@ -318,7 +331,7 @@ export default function App() {
           .eq('user_id', session.user.id);
         
         if (data) {
-          setSavedPostIds(data.map(item => item.post_id));
+          setSavedPostIds(data.map((item: any) => item.post_id));
         }
       };
       fetchSavedPosts();
