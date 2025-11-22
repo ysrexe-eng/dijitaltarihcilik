@@ -298,6 +298,16 @@ export default function App() {
 
   // Auth Setup (Supabase v2)
   useEffect(() => {
+    // URL hash kontrolü (Recovery linkleri için manuel kontrol)
+    // Bazı e-posta istemcileri ve tarayıcılarda 'PASSWORD_RECOVERY' event'i tetiklenmeden
+    // sayfa yüklenebiliyor. Bu durumda URL'deki 'type=recovery' parametresine bakarak
+    // modu manuel olarak açıyoruz.
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setIsRecoveryMode(true);
+      setIsSettingsOpen(true);
+    }
+
     const setupAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -314,14 +324,18 @@ export default function App() {
         setSession(session);
         setAuthLoading(false);
         
-        // Şifre sıfırlama akışı kontrolü
+        // Şifre sıfırlama akışı kontrolü (Event bazlı)
         if (event === 'PASSWORD_RECOVERY') {
            setIsRecoveryMode(true);
            setIsSettingsOpen(true);
         }
 
-        // Eğer oturum açıldıysa ve URL'de hash varsa (token vb), temizle
-        if (session && window.location.hash && event !== 'PASSWORD_RECOVERY') {
+        // URL Temizleme:
+        // Eğer recovery modundaysak (URL'de type=recovery varsa veya event geldiyse) URL'i temizleme.
+        // Aksi takdirde şifre sıfırlama token'ı kaybolabilir.
+        const isRecoveryHash = window.location.hash.includes('type=recovery');
+        
+        if (session && window.location.hash && event !== 'PASSWORD_RECOVERY' && !isRecoveryHash) {
            window.history.replaceState(null, '', window.location.pathname);
         }
       });
