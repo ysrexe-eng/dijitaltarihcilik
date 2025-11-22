@@ -169,9 +169,6 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSav
           {article.id === '1' && (
             <div className="my-12 not-prose transform hover:scale-[1.01] transition-transform duration-500">
               <StatsChart />
-              <p className="text-center text-xs md:text-sm text-slate-500 mt-3 italic">
-                Şekil 1.1: Son 15 yılda akademik çalışmalarda dijital kaynak kullanımının artışı.
-              </p>
             </div>
           )}
           

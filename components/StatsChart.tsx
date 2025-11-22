@@ -14,13 +14,9 @@ const data = [
 
 export const StatsChart: React.FC = () => {
   return (
-    <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 h-[280px] md:h-[400px]">
-      <div className="mb-4 border-b border-slate-100 pb-3">
-        <h3 className="text-sm md:text-base font-serif font-bold text-slate-900">Şekil 1.1: Araştırma Yöntemleri</h3>
-        <p className="text-[10px] md:text-xs text-slate-500 mt-1">Dijital vs Fiziksel Arşiv Kullanımı (2010-2024)</p>
-      </div>
-      <ResponsiveContainer width="100%" height="75%">
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+    <div className="bg-white p-2 md:p-6 rounded-xl shadow-sm border border-slate-200 h-[350px] md:h-[400px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
           <defs>
             <linearGradient id="colorDigital" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.8}/>
@@ -30,14 +26,14 @@ export const StatsChart: React.FC = () => {
           <XAxis 
             dataKey="year" 
             stroke="#94a3b8" 
-            fontSize={10} 
+            fontSize={12} 
             tickLine={false} 
             axisLine={false} 
-            tickMargin={5}
+            tickMargin={10}
           />
           <YAxis 
             stroke="#94a3b8" 
-            fontSize={10} 
+            fontSize={12} 
             tickLine={false} 
             axisLine={false} 
             unit="%" 
@@ -51,6 +47,7 @@ export const StatsChart: React.FC = () => {
             type="monotone" 
             dataKey="digital" 
             stroke="#4f46e5" 
+            strokeWidth={3}
             fillOpacity={1} 
             fill="url(#colorDigital)" 
             name="Dijital"

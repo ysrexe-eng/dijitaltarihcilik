@@ -294,6 +294,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [savedPostIds, setSavedPostIds] = useState<string[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
 
   // Auth Setup (Supabase v2)
   useEffect(() => {
@@ -309,11 +310,18 @@ export default function App() {
 
       const {
         data: { subscription },
-      } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+      } = supabase.auth.onAuthStateChange((event: string, session: any) => {
         setSession(session);
         setAuthLoading(false);
+        
+        // Şifre sıfırlama akışı kontrolü
+        if (event === 'PASSWORD_RECOVERY') {
+           setIsRecoveryMode(true);
+           setIsSettingsOpen(true);
+        }
+
         // Eğer oturum açıldıysa ve URL'de hash varsa (token vb), temizle
-        if (session && window.location.hash) {
+        if (session && window.location.hash && event !== 'PASSWORD_RECOVERY') {
            window.history.replaceState(null, '', window.location.pathname);
         }
       });
@@ -643,8 +651,12 @@ export default function App() {
 
       <AccountSettingsModal 
         isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        onClose={() => {
+           setIsSettingsOpen(false);
+           setIsRecoveryMode(false);
+        }}
         session={session}
+        isRecovery={isRecoveryMode}
       />
 
       <footer className="bg-slate-900 text-white py-16 mt-auto border-t border-slate-800">
