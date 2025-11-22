@@ -11,6 +11,7 @@ interface AccountSettingsModalProps {
 export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOpen, onClose, session }) => {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
   if (!isOpen) return null;
@@ -39,12 +40,38 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
   };
 
   const handleDeleteAccount = async () => {
-    if (window.confirm('Hesabınızı silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm kaydedilen verileriniz silinir.')) {
-        // Not: İstemci tarafında auth user silmek için özel yetki veya backend fonksiyonu gerekir.
-        // Bu örnekte kullanıcıyı çıkış yaptırıp yerel veriyi temizliyoruz.
-        alert('Hesap silme talebiniz alındı. Güvenlik gereği oturumunuz sonlandırılıyor.');
+    if (!window.confirm('Hesabınızı silmek istediğinize emin misiniz? Bu işlem GERİ ALINAMAZ.')) {
+        return;
+    }
+
+    setDeleteLoading(true);
+    try {
+        // 1. Önce kullanıcıya ait verileri temizlemeyi deneyelim (Saved Posts vb.)
+        // Eğer veritabanında "ON DELETE CASCADE" varsa buna gerek kalmaz ama güvenlik için ekleyelim.
+        await supabase.from('saved_posts').delete().eq('user_id', session.user.id);
+
+        // 2. RPC Çağrısı: Kullanıcının kendisini silmesi için Supabase'de 'delete_user' fonksiyonu olmalıdır.
+        const { error } = await supabase.rpc('delete_user');
+
+        if (error) {
+            // Eğer RPC fonksiyonu yoksa standart bir hata mesajı gösterir
+            console.error('RPC Error:', error);
+            if (error.message.includes('function delete_user() does not exist')) {
+                throw new Error("Veritabanı ayarı eksik: Lütfen Supabase panelinde 'delete_user' SQL fonksiyonunu oluşturun.");
+            }
+            throw error;
+        }
+
         await supabase.auth.signOut();
         onClose();
+        alert('Hesabınız başarıyla silindi.');
+        window.location.reload();
+
+    } catch (err: any) {
+        console.error(err);
+        alert(`Hata: ${err.message}`);
+    } finally {
+        setDeleteLoading(false);
     }
   };
 
@@ -105,9 +132,10 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
               <p className="text-xs text-slate-500 mb-4">Hesabınızı sildiğinizde tüm kaydedilen yazılarınız ve verileriniz kalıcı olarak silinir.</p>
               <button 
                 onClick={handleDeleteAccount}
-                className="w-full py-2.5 border border-red-200 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
+                disabled={deleteLoading}
+                className="w-full py-2.5 border border-red-200 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                  <Trash2 className="w-4 h-4" />
+                  {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   Hesabımı Sil
               </button>
           </div>
