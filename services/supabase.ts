@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Vite ortam değişkenlerini okuma
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 
 // Konfigürasyon kontrolü
 export const isConfigured = supabaseUrl && supabaseUrl.length > 0 && !supabaseUrl.includes('placeholder');

@@ -25,9 +25,13 @@ export const AuthForm: React.FC<AuthFormProps> = ({ type, onSuccess, onToggleMod
       }
 
       if (type === 'REGISTER') {
+        // window.location.origin: O anki tarayıcı adresini alır (örn: http://localhost:5173 veya https://site-adiniz.com)
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: window.location.origin,
+          }
         });
         
         if (error) throw error;
