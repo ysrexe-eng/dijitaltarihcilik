@@ -294,32 +294,41 @@ export default function App() {
 
   // Auth Setup (Supabase v2)
   useEffect(() => {
-    if (!isConfigured) return;
+    const setupAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
 
-    supabase.auth.getSession().then(({ data: { session } }: any) => {
-      setSession(session);
-    });
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+          setSession(session);
+        });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
+        return () => subscription.unsubscribe();
+      } catch (e) {
+        console.warn("Auth setup error (likely due to mock mode):", e);
+      }
+    };
+    
+    setupAuth();
   }, []);
 
   // Fetch Saved Posts
   useEffect(() => {
-    if (session && isConfigured) {
+    if (session) {
       const fetchSavedPosts = async () => {
-        const { data } = await supabase
-          .from('saved_posts')
-          .select('post_id')
-          .eq('user_id', session.user.id);
-        
-        if (data) {
-          setSavedPostIds(data.map((item: any) => item.post_id));
+        try {
+          const { data, error } = await supabase
+            .from('saved_posts')
+            .select('post_id')
+            .eq('user_id', session.user.id);
+          
+          if (data && !error) {
+            setSavedPostIds(data.map((item: any) => item.post_id));
+          }
+        } catch (e) {
+          console.warn("Fetch posts error (likely due to mock mode):", e);
         }
       };
       fetchSavedPosts();
@@ -335,39 +344,45 @@ export default function App() {
   };
 
   const handleToggleSave = async (postId: string) => {
-    if (!isConfigured) {
-      alert('Veritabanı bağlantısı yok. Bu özellik şu an kullanılamaz.');
-      return;
-    }
-
+    // isConfigured kontrolü burada şart değil çünkü mock supabase hata mesajı dönecek
+    // ama UX için yine de ekleyebiliriz.
+    
     if (!session) {
       alert('Blog kaydetmek için lütfen giriş yapın.');
       setViewState(ViewState.LOGIN);
       return;
     }
 
-    const isSaved = savedPostIds.includes(postId);
-    
-    if (isSaved) {
-      // Unsave
-      const { error } = await supabase
-        .from('saved_posts')
-        .delete()
-        .eq('user_id', session.user.id)
-        .eq('post_id', postId);
+    try {
+      const isSaved = savedPostIds.includes(postId);
       
-      if (!error) {
-        setSavedPostIds(prev => prev.filter(id => id !== postId));
+      if (isSaved) {
+        // Unsave
+        const { error } = await supabase
+          .from('saved_posts')
+          .delete()
+          .eq('user_id', session.user.id)
+          .eq('post_id', postId);
+        
+        if (!error) {
+          setSavedPostIds(prev => prev.filter(id => id !== postId));
+        } else {
+           alert(error.message);
+        }
+      } else {
+        // Save
+        const { error } = await supabase
+          .from('saved_posts')
+          .insert([{ user_id: session.user.id, post_id: postId }]);
+        
+        if (!error) {
+          setSavedPostIds(prev => [...prev, postId]);
+        } else {
+          alert(error.message);
+        }
       }
-    } else {
-      // Save
-      const { error } = await supabase
-        .from('saved_posts')
-        .insert([{ user_id: session.user.id, post_id: postId }]);
-      
-      if (!error) {
-        setSavedPostIds(prev => [...prev, postId]);
-      }
+    } catch (e: any) {
+      alert(e.message || "İşlem sırasında hata oluştu");
     }
   };
 
