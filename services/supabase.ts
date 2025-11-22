@@ -15,32 +15,35 @@ if (isConfigured) {
     auth: {
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: true, // URL hash'inden session'ı yakalamak için kritik
+      detectSessionInUrl: true,
     },
   });
 } else {
-  console.warn('Supabase URL veya Key eksik! Uygulama MOCK (Demo) modunda çalışıyor.');
-  
-  // Mock (Sahte) İstemci - Hata vermemesi için boş fonksiyonlar
+  // Fallback Client (Sessiz Mod)
+  // Kullanıcıya "demo" yazısı göstermez, sadece konsola teknik log düşer.
   supabaseClient = {
     auth: {
       getSession: async () => ({ data: { session: null }, error: null }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      signInWithPassword: async () => ({ data: { session: null }, error: { message: 'Demo Modu: Veritabanı anahtarları girilmediği için giriş yapılamaz.' } }),
-      signUp: async () => ({ data: { session: null }, error: { message: 'Demo Modu: Veritabanı anahtarları girilmediği için kayıt olunamaz.' } }),
+      signInWithPassword: async () => ({ data: { session: null }, error: { message: 'Bağlantı yapılandırması eksik. Lütfen yönetici ile iletişime geçin.' } }),
+      signInWithOtp: async () => ({ data: { session: null }, error: { message: 'Bağlantı yapılandırması eksik.' } }),
+      verifyOtp: async () => ({ data: { session: null }, error: { message: 'Doğrulama yapılamadı.' } }),
+      signUp: async () => ({ data: { session: null }, error: { message: 'Kayıt işlemi şu an gerçekleştirilemiyor.' } }),
       signOut: async () => ({ error: null }),
+      updateUser: async () => ({ error: { message: 'Güncelleme yapılamadı.' } }),
     },
     from: (table: string) => ({
       select: () => ({
         eq: (col: string, val: any) => Promise.resolve({ data: [], error: null })
       }),
-      insert: (data: any) => Promise.resolve({ error: { message: 'Demo modunda kayıt yapılamaz.' } }),
+      insert: (data: any) => Promise.resolve({ error: { message: 'İşlem kaydedilemedi.' } }),
       delete: () => ({
         eq: (col: string, val: any) => ({
            eq: (col2: string, val2: any) => Promise.resolve({ error: null }) 
         })
       })
-    })
+    }),
+    rpc: () => Promise.resolve({ error: { message: 'İşlem gerçekleştirilemedi.' } })
   };
 }
 

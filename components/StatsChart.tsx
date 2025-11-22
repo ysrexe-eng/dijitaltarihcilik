@@ -14,12 +14,12 @@ const data = [
 
 export const StatsChart: React.FC = () => {
   return (
-    <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 h-[300px] md:h-[400px]">
-      <div className="mb-4 md:mb-6 border-b border-slate-100 pb-4">
-        <h3 className="text-sm md:text-base font-serif font-bold text-slate-900">Şekil 1.1: Araştırma Yöntemleri Değişimi</h3>
-        <p className="text-[10px] md:text-xs text-slate-500 mt-1">Akademik tarih araştırmalarında dijital arşiv kullanımının fiziksel arşivlere oranı (2010-2024).</p>
+    <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 h-[280px] md:h-[400px]">
+      <div className="mb-4 border-b border-slate-100 pb-3">
+        <h3 className="text-sm md:text-base font-serif font-bold text-slate-900">Şekil 1.1: Araştırma Yöntemleri</h3>
+        <p className="text-[10px] md:text-xs text-slate-500 mt-1">Dijital vs Fiziksel Arşiv Kullanımı (2010-2024)</p>
       </div>
-      <ResponsiveContainer width="100%" height="70%">
+      <ResponsiveContainer width="100%" height="75%">
         <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <defs>
             <linearGradient id="colorDigital" x1="0" y1="0" x2="0" y2="1">
@@ -27,12 +27,25 @@ export const StatsChart: React.FC = () => {
               <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
             </linearGradient>
           </defs>
-          <XAxis dataKey="year" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-          <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} unit="%" />
+          <XAxis 
+            dataKey="year" 
+            stroke="#94a3b8" 
+            fontSize={10} 
+            tickLine={false} 
+            axisLine={false} 
+            tickMargin={5}
+          />
+          <YAxis 
+            stroke="#94a3b8" 
+            fontSize={10} 
+            tickLine={false} 
+            axisLine={false} 
+            unit="%" 
+          />
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
           <Tooltip 
-            contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
-            itemStyle={{ color: '#fff' }}
+            contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px', padding: '8px' }}
+            itemStyle={{ color: '#fff', fontSize: '12px' }}
           />
           <Area 
             type="monotone" 
@@ -40,7 +53,7 @@ export const StatsChart: React.FC = () => {
             stroke="#4f46e5" 
             fillOpacity={1} 
             fill="url(#colorDigital)" 
-            name="Dijital Kaynak Kullanımı"
+            name="Dijital"
           />
         </AreaChart>
       </ResponsiveContainer>
