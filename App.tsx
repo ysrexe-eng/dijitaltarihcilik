@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ArticleView } from './components/ArticleView';
 import { AuthForm } from './components/AuthForm';
+import { AccountSettingsModal } from './components/AccountSettingsModal';
 import { BlogPost, ViewState } from './types';
 import { ArrowRight, BookOpen, TrendingUp, Globe, Cpu, Bookmark, Loader2 } from 'lucide-react';
 import { supabase, isConfigured } from './services/supabase';
@@ -292,6 +293,7 @@ export default function App() {
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [savedPostIds, setSavedPostIds] = useState<string[]>([]);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Auth Setup (Supabase v2)
   useEffect(() => {
@@ -614,6 +616,7 @@ export default function App() {
         onRegister={() => setViewState(ViewState.REGISTER)}
         onSaved={() => setViewState(ViewState.SAVED)}
         onLogout={() => supabase.auth.signOut()}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         session={session}
       />
 
@@ -637,6 +640,12 @@ export default function App() {
           onToggleSave={handleToggleSave}
         />
       )}
+
+      <AccountSettingsModal 
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        session={session}
+      />
 
       <footer className="bg-slate-900 text-white py-16 mt-auto border-t border-slate-800">
         <div className="max-w-6xl mx-auto px-4">

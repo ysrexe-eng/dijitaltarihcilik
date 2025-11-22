@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BlogPost } from '../types';
-import { ArrowLeft, Calendar, Clock, Share2, Bookmark } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Share2, Bookmark, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { StatsChart } from './StatsChart';
 import { ComparisonChart } from './ComparisonChart';
@@ -16,6 +16,7 @@ interface ArticleViewProps {
 export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSaved, onToggleSave }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -35,6 +36,31 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSav
     setIsSaving(false);
   };
 
+  const handleShare = async () => {
+    const shareData = {
+      title: article.title,
+      text: article.summary,
+      url: window.location.href
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        console.error('Share error:', err);
+      }
+    } else {
+      // Fallback to clipboard
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      } catch (err) {
+        console.error('Clipboard error:', err);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       {/* Reading Progress Bar */}
@@ -46,7 +72,6 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSav
       </div>
 
       <article className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8 animate-fade-in-up">
-        {/* Removed sticky class to fix overlap issue with main Header */}
         <nav className="flex items-center justify-between mb-8">
           <button 
             onClick={onBack}
@@ -57,8 +82,17 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSav
           </button>
           
           <div className="flex gap-2">
-            <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors">
-              <Share2 className="w-5 h-5" />
+            <button 
+              onClick={handleShare}
+              className={`p-2 rounded-full transition-colors flex items-center gap-2 ${
+                isCopied 
+                  ? 'text-green-600 bg-green-50' 
+                  : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+              }`}
+              title="Paylaş"
+            >
+              {isCopied ? <Check className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
+              {isCopied && <span className="text-xs font-medium">Kopyalandı!</span>}
             </button>
             <button 
               onClick={handleSaveClick}
@@ -68,6 +102,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSav
                   ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' 
                   : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
               }`}
+              title="Kaydet"
             >
               <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
             </button>
@@ -85,7 +120,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSav
           <h1 className="text-3xl md:text-5xl lg:text-6xl font-serif font-bold text-slate-900 mb-8 leading-tight">
             {article.title}
           </h1>
-          <div className="flex items-center justify-center gap-8 text-slate-500 text-sm border-y border-slate-100 py-6">
+          <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8 text-slate-500 text-sm border-y border-slate-100 py-6">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-serif font-bold">
                 {article.author.charAt(0)}
@@ -113,7 +148,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSav
         </div>
 
         <div className="prose prose-lg prose-indigo mx-auto markdown-content font-serif">
-          <p className="lead text-2xl text-slate-600 font-light mb-10 leading-relaxed">
+          <p className="lead text-xl md:text-2xl text-slate-600 font-light mb-10 leading-relaxed">
             {article.summary}
           </p>
           
@@ -123,7 +158,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSav
           {article.id === '1' && (
             <div className="my-12 not-prose transform hover:scale-[1.01] transition-transform duration-500">
               <StatsChart />
-              <p className="text-center text-sm text-slate-500 mt-3 italic">
+              <p className="text-center text-xs md:text-sm text-slate-500 mt-3 italic">
                 Şekil 1.1: Son 15 yılda akademik çalışmalarda dijital kaynak kullanımının artışı.
               </p>
             </div>
