@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Vite ortam değişkenlerini okuma
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+// Vite ortam değişkenlerini okuma (Standart Vite kullanımı import.meta.env şeklindedir)
+const env = (import.meta as any).env || {};
+const supabaseUrl = env.VITE_SUPABASE_URL;
+const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
 
 // Konfigürasyon kontrolü
 export const isConfigured = supabaseUrl && supabaseUrl.length > 0 && !supabaseUrl.includes('placeholder');
@@ -10,7 +11,13 @@ export const isConfigured = supabaseUrl && supabaseUrl.length > 0 && !supabaseUr
 let supabaseClient;
 
 if (isConfigured) {
-  supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true, // URL hash'inden session'ı yakalamak için kritik
+    },
+  });
 } else {
   console.warn('Supabase URL veya Key eksik! Uygulama MOCK (Demo) modunda çalışıyor.');
   

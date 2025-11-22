@@ -3,7 +3,7 @@ import { Header } from './components/Header';
 import { ArticleView } from './components/ArticleView';
 import { AuthForm } from './components/AuthForm';
 import { BlogPost, ViewState } from './types';
-import { ArrowRight, BookOpen, TrendingUp, Globe, Cpu, Bookmark } from 'lucide-react';
+import { ArrowRight, BookOpen, TrendingUp, Globe, Cpu, Bookmark, Loader2 } from 'lucide-react';
 import { supabase, isConfigured } from './services/supabase';
 
 // Blog content 
@@ -290,6 +290,7 @@ export default function App() {
   
   // Auth & Database State
   const [session, setSession] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [savedPostIds, setSavedPostIds] = useState<string[]>([]);
 
   // Auth Setup (Supabase v2)
@@ -298,17 +299,24 @@ export default function App() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
-
-        const {
-          data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-          setSession(session);
-        });
-
-        return () => subscription.unsubscribe();
       } catch (e) {
-        console.warn("Auth setup error (likely due to mock mode):", e);
+        console.warn("Auth session check error:", e);
+      } finally {
+        setAuthLoading(false);
       }
+
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+        setSession(session);
+        setAuthLoading(false);
+        // Eğer oturum açıldıysa ve URL'de hash varsa (token vb), temizle
+        if (session && window.location.hash) {
+           window.history.replaceState(null, '', window.location.pathname);
+        }
+      });
+
+      return () => subscription.unsubscribe();
     };
     
     setupAuth();
@@ -344,9 +352,6 @@ export default function App() {
   };
 
   const handleToggleSave = async (postId: string) => {
-    // isConfigured kontrolü burada şart değil çünkü mock supabase hata mesajı dönecek
-    // ama UX için yine de ekleyebiliriz.
-    
     if (!session) {
       alert('Blog kaydetmek için lütfen giriş yapın.');
       setViewState(ViewState.LOGIN);
@@ -409,6 +414,18 @@ export default function App() {
       )
     );
   }, [posts, selectedCategory, viewState, savedPostIds]);
+
+  // Auth Loading Splash Screen (Optional, prevents flickering)
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mx-auto mb-4" />
+          <p className="text-slate-500 font-serif">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
 
   const renderMainContent = () => (
     <main className="animate-fade-in-up">
