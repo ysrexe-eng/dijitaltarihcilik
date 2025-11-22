@@ -4,7 +4,7 @@ import { ArticleView } from './components/ArticleView';
 import { AuthForm } from './components/AuthForm';
 import { BlogPost, ViewState } from './types';
 import { ArrowRight, BookOpen, TrendingUp, Globe, Cpu, Bookmark } from 'lucide-react';
-import { supabase } from './services/supabase';
+import { supabase, isConfigured } from './services/supabase';
 
 // Blog content 
 const INITIAL_POSTS: BlogPost[] = [
@@ -292,38 +292,26 @@ export default function App() {
   const [session, setSession] = useState<any>(null);
   const [savedPostIds, setSavedPostIds] = useState<string[]>([]);
 
-  // Auth Setup
+  // Auth Setup (Supabase v2)
   useEffect(() => {
-    // Supabase v1 compatibility: session() is synchronous
-    const currentSession = supabase.auth.session ? supabase.auth.session() : null;
-    setSession(currentSession);
+    if (!isConfigured) return;
 
-    // If using v2 or newer but type defs were missing, try getSession async
-    if (!currentSession && supabase.auth.getSession) {
-      supabase.auth.getSession().then(({ data }: any) => {
-         if (data?.session) setSession(data.session);
-      });
-    }
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
+      setSession(session);
+    });
 
     const {
-      data: subscription,
+      data: { subscription },
     } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       setSession(session);
     });
 
-    return () => {
-      // Handle both v1 (subscription is the object) and v2 (subscription.subscription is the object) structure
-      if (subscription?.unsubscribe) {
-        subscription.unsubscribe();
-      } else if (subscription?.subscription?.unsubscribe) {
-        subscription.subscription.unsubscribe();
-      }
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   // Fetch Saved Posts
   useEffect(() => {
-    if (session) {
+    if (session && isConfigured) {
       const fetchSavedPosts = async () => {
         const { data } = await supabase
           .from('saved_posts')
@@ -347,6 +335,11 @@ export default function App() {
   };
 
   const handleToggleSave = async (postId: string) => {
+    if (!isConfigured) {
+      alert('Veritabanı bağlantısı yok. Bu özellik şu an kullanılamaz.');
+      return;
+    }
+
     if (!session) {
       alert('Blog kaydetmek için lütfen giriş yapın.');
       setViewState(ViewState.LOGIN);

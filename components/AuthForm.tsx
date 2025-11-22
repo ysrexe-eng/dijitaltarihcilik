@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, isConfigured } from '../services/supabase';
 import { Loader2, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 
 interface AuthFormProps {
@@ -19,26 +19,50 @@ export const AuthForm: React.FC<AuthFormProps> = ({ type, onSuccess, onToggleMod
     setLoading(true);
     setError(null);
 
+    // Veritabanı bağlantısı kontrolü
+    if (!isConfigured) {
+        setLoading(false);
+        setError('Veritabanı bağlantısı bulunamadı. Lütfen Vercel/Netlify ayarlarında VITE_SUPABASE_URL ve KEY tanımlarını yapınız.');
+        console.error('AUTH ERROR: Supabase URL tanımlı değil.');
+        return;
+    }
+
     try {
+      console.log(`Auth işlemi başlatılıyor: ${type} - Email: ${email}`);
+
       if (type === 'REGISTER') {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
         });
+        
+        console.log('Supabase SignUp Yanıtı:', { data, error });
+
         if (error) throw error;
+        
+        // Başarılı kayıt
         alert('Kayıt başarılı! Lütfen e-posta kutunuzu kontrol edin veya giriş yapın.');
-        onToggleMode(); // Switch to login after signup
+        onToggleMode(); 
       } else {
-        // Using signIn instead of signInWithPassword to be compatible with older Supabase versions
-        const { error } = await supabase.auth.signIn({
+        // Supabase v2 login metodu: signInWithPassword
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
+
+        console.log('Supabase SignIn Yanıtı:', { data, error });
+
         if (error) throw error;
         onSuccess();
       }
     } catch (err: any) {
-      setError(err.message || 'Bir hata oluştu.');
+      console.error('Auth İşlemi Hatası:', err);
+      // Network hatası genellikle URL yanlışlığından veya CORS'tan kaynaklanır
+      if (err.message === 'Failed to fetch') {
+          setError('Sunucuya bağlanılamadı (Network Error). Lütfen internet bağlantınızı veya Supabase URL ayarlarını kontrol edin.');
+      } else {
+          setError(err.message || 'Bir hata oluştu.');
+      }
     } finally {
       setLoading(false);
     }
@@ -58,10 +82,16 @@ export const AuthForm: React.FC<AuthFormProps> = ({ type, onSuccess, onToggleMod
 
         <div className="p-8">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
-              {error}
+            <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
+          )}
+          
+          {!isConfigured && !error && (
+             <div className="mb-4 p-3 bg-amber-50 border border-amber-100 text-amber-700 text-xs rounded-lg">
+                 Uyarı: Veritabanı anahtarları tespit edilemedi. Giriş işlemi çalışmayabilir.
+             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
