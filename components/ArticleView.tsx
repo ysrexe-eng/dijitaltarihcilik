@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BlogPost } from '../types';
-import { ArrowLeft, Calendar, Clock, Share2, Bookmark, Check } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Share2, Bookmark, Check, Link as LinkIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { StatsChart } from './StatsChart';
 import { ComparisonChart } from './ComparisonChart';
@@ -16,7 +16,7 @@ interface ArticleViewProps {
 export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSaved, onToggleSave }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
+  const [shareState, setShareState] = useState<'idle' | 'copied'>('idle');
 
   useEffect(() => {
     const handleScroll = () => {
@@ -43,20 +43,22 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSav
       url: window.location.href
     };
 
-    if (navigator.share) {
+    // Mobil cihazlarda veya destekleyen tarayıcılarda native paylaşım menüsünü aç
+    if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) {
       try {
         await navigator.share(shareData);
       } catch (err) {
-        console.error('Share error:', err);
+        console.error('Share cancelled or error:', err);
       }
     } else {
-      // Fallback to clipboard
+      // Masaüstü için panoya kopyala
       try {
         await navigator.clipboard.writeText(window.location.href);
-        setIsCopied(true);
-        setTimeout(() => setIsCopied(false), 2000);
+        setShareState('copied');
+        setTimeout(() => setShareState('idle'), 2500);
       } catch (err) {
         console.error('Clipboard error:', err);
+        alert('Link kopyalanamadı, lütfen manuel kopyalayın.');
       }
     }
   };
@@ -84,25 +86,34 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, isSav
           <div className="flex gap-2">
             <button 
               onClick={handleShare}
-              className={`p-2 rounded-full transition-colors flex items-center gap-2 ${
-                isCopied 
-                  ? 'text-green-600 bg-green-50' 
-                  : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+              className={`px-4 py-2 rounded-full transition-all flex items-center gap-2 border ${
+                shareState === 'copied'
+                  ? 'bg-green-50 text-green-700 border-green-200' 
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-200 hover:text-indigo-600'
               }`}
               title="Paylaş"
             >
-              {isCopied ? <Check className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
-              {isCopied && <span className="text-xs font-medium">Kopyalandı!</span>}
+              {shareState === 'copied' ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span className="text-xs font-bold">Link Kopyalandı</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4" />
+                  <span className="text-xs font-medium hidden sm:inline">Paylaş</span>
+                </>
+              )}
             </button>
             <button 
               onClick={handleSaveClick}
               disabled={isSaving}
-              className={`p-2 rounded-full transition-colors ${
+              className={`p-2 rounded-full transition-colors border ${
                 isSaved 
-                  ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' 
-                  : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                  ? 'text-indigo-600 bg-indigo-50 border-indigo-100' 
+                  : 'text-slate-400 bg-white border-slate-200 hover:text-indigo-600 hover:border-indigo-200'
               }`}
-              title="Kaydet"
+              title={isSaved ? "Kaydedilenlerden Çıkar" : "Kaydet"}
             >
               <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
             </button>
